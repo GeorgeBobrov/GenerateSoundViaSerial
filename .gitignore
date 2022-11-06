@@ -1,0 +1,11 @@
+*.dcu
+*.wav
+*.exe
+*.res
+*.local
+*.deployproj
+*.stat
+*.identcache
+__history
+
+
