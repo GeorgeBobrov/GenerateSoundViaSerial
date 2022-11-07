@@ -56,6 +56,7 @@ type
     FloatEditCustomBufferSize: TFloatEdit;
     LabelBufferSize: TLabel;
     CheckBoxSetBoudMeasured: TCheckBox;
+    ButtonSetSR: TButton;
     procedure ButtonProcessClick(Sender: TObject);
     procedure ButtonSetupClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
@@ -82,12 +83,12 @@ type
     procedure ButtonOpenWAVClick(Sender: TObject);
     procedure ButtonPlayWAVClick(Sender: TObject);
     procedure ComPortTxEmptyPlayWAV(Sender: TObject);
+    procedure ButtonSetSRClick(Sender: TObject);
   private
     { Private declarations }
   public
     { Public declarations }
     frequency: Integer;
-    PWM_Value: word;
     lastGenIndex: UInt64;
     BytesTransmitted: Cardinal;
     PlayToneDelayEnd: Boolean;
@@ -105,7 +106,7 @@ type
     procedure PlayTone(frequency: Integer);
     procedure NoTone;
     function Delay(duration_ms: Integer): boolean;
-    function TakeWAVSample: Word;
+    function TakeWAVSample: Double;
 
     procedure WMDeviceChange(var Message: TMessage); message WM_DEVICECHANGE;
   end;
@@ -133,6 +134,7 @@ begin
       Result[i] := '1';
 end;
 
+
 procedure TFormComSound.ButtonSetupClick(Sender: TObject);
 var
   boud: Integer;
@@ -158,8 +160,8 @@ begin
   if RadioButtonBitPerSample.Checked then
     setupConversionViaBitCount(boud, FloatEditBitPerSample.ValueInt);
 
-  FloatEditSample.MaxValueInt := statesInOutput;
-  LabelFloatEditSample.Caption := 'Value (max ' + IntToStr(statesInOutput) + '):';
+  FloatEditSample.MaxValueInt := maxInputSampleValue;
+  LabelFloatEditSample.Caption := 'Value (max ' + IntToStr(maxInputSampleValue) + '):';
 
 
   MemoSettings.Clear;
@@ -167,7 +169,7 @@ begin
   MemoSettings.Lines.Add('sampleRate: ' + IntToStr(outputSampleRate));
   MemoSettings.Lines.Add('input: ' + IntToStr(bitsInSample) + ' bit, '  + IntToStr(statesInSample) + ' states');
   MemoSettings.Lines.Add('output: ' + IntToStr(bytesInOutputPacket) + ' bytes, ' +
-    IntToStr(statesInOutput + 1) + ' states');
+    IntToStr(maxInputSampleValue + 1) + ' states'); 
 
   s := MemoSettings.Text;
   SetLength(s, Length(s) - 2);
@@ -193,15 +195,11 @@ end;
 procedure TFormComSound.FormCreate(Sender: TObject);
 var
   msg: TMessage;
-//  song: String;
 begin
   ComPortAfterClose(nil);
   ButtonSetupClick(nil);
   WMDeviceChange(msg);
   frequency := FloatEditFrequency.ValueInt;
-
-  // for song in songs := 0 do
-  // ListBoxMelodies.Items.Add(song)
 end;
 
  // ----------------------------         ComPort controls     -------------------------------------------
@@ -311,18 +309,6 @@ begin
   MemoDebug.Visible := not MemoDebug.Visible;
   PanelMelodies.Visible := not PanelMelodies.Visible;
   PanelDebug.Visible := not PanelDebug.Visible;
-
-//  if MemoDebug.Visible then
-//  begin
-//    MemoDebug.Align := alClient;
-//    PanelMelodies.Align := alTop;
-//    PanelMelodies.Top := 1000;
-//  end
-//  else
-//  begin
-//    PanelMelodies.Align := alClient;
-//    MemoDebug.Align := alTop;
-//  end;
 end;
 
 
@@ -336,7 +322,7 @@ begin
   curSample := FloatEditSample.ValueInt;
 
   SetLength(outputBuffer, bytesInOutputPacket);
-  processSample(curSample, PByte(outputBuffer), false);
+  processSample(curSample, PByte(outputBuffer));
 
   for i := 0 to Length(outputBuffer) - 1 do
     str := str + ' ' + IntToBinByte(outputBuffer[i]);
@@ -351,19 +337,18 @@ var
   i: Integer;
   generatorBuffer: array of byte;
   period: Double;
-  curSampleSin: Double; // -1..1
+  curSampleSin: Double;
   str: string;
-  halfStatesInOutput: Double;
 begin
   period := (outputSampleRate / frequency);
   SetLength(generatorBuffer, 80);
 
-  halfStatesInOutput := statesInOutput / 2;
 
   for i := 0 to Length(generatorBuffer) - 1 do
   begin
-    curSampleSin := sin(((i / period) * 2 * Pi) + (Pi / 2));
-    generatorBuffer[i] := Round((curSampleSin * halfStatesInOutput) + halfStatesInOutput);
+    curSampleSin := sin(((i / period) * 2 * Pi) + (Pi / 2));  // -1..1
+    curSampleSin := (curSampleSin + 1) / 2;                   //  0..1
+    generatorBuffer[i] := Round(curSampleSin * maxInputSampleValue);
   end;
 
   for i := 0 to Length(generatorBuffer) - 1 do
@@ -381,6 +366,7 @@ var
   i: Integer;
   outputSampleBuffer: array of byte;
   outputBufferSize: Integer;
+  PWM_Value: word;
 begin
   if MemoDebug.Visible then
     ButtonProcessClick(nil);
@@ -398,15 +384,11 @@ begin
 
   SetLength(outputBuffer, outputBufferSize);
 
-//  curOutputSample := processSample3bit(PWM_Value);
-
   SetLength(outputSampleBuffer, bytesInOutputPacket);
-  processSample(PWM_Value, PByte(outputSampleBuffer), false);
-
+  processSample(PWM_Value, PByte(outputSampleBuffer));
 
   for i := 0 to Length(outputBuffer) - 1 do
     outputBuffer[i] := outputSampleBuffer[i mod Length(outputSampleBuffer)];
-//    outputBuffer[i] := curOutputSample;
 end;
 
 
@@ -460,7 +442,7 @@ end;
 //begin
 //  period := (outputSampleRate / frequency);
 //
-//  halfStatesInOutput := statesInOutput / 2;
+//  halfStatesInOutput := maxInputSampleValue / 2;
 //  curSampleSin := sin(((lastGenIndex / period) * 2 * Pi) + (Pi / 2));
 //  curSample := Round((curSampleSin * halfStatesInOutput) + halfStatesInOutput);
 //
@@ -477,11 +459,10 @@ end;
 procedure TFormComSound.ComPortTxEmptyGenerator(Sender: TObject);
 var
   period: Double;
-  curSampleSin: Double; // -1..1
-  curSample: word;
+  curSampleSin: Double;
+  curSample: Double;
   outputBufferSize: Integer;
   outputBuffer: array of byte;
-  halfStatesInOutput: Double;
   i: Integer;
 begin
   period := (outputSampleRate / frequency);
@@ -491,19 +472,17 @@ begin
   else
     outputBufferSize := 32 * bytesInOutputPacket;
 
-//  LabelBufferSize.Caption := IntToStr(outputBufferSize);
-
   SetLength(outputBuffer, outputBufferSize);
-  halfStatesInOutput := statesInOutput / 2;
 
   for i := 0 to (Length(outputBuffer) div bytesInOutputPacket) - 1 do
   begin
-    curSampleSin := sin(((lastGenIndex / period) * 2 * Pi) + (Pi / 2));
-    curSample := Round((curSampleSin * halfStatesInOutput) + halfStatesInOutput);
+    curSampleSin := sin(((lastGenIndex / period) * 2 * Pi) + (Pi / 2));  // -1..1
+    curSampleSin := (curSampleSin + 1) / 2;                   //  0..1
+    curSample := curSampleSin * maxInputSampleValue;
+
     Inc(lastGenIndex);
 
-//    outputBuffer[i] := processSample3bit(curSample);
-    processSample(curSample, @outputBuffer[i*bytesInOutputPacket], false);
+    processSample(curSample, @outputBuffer[i*bytesInOutputPacket]);
   end;
 
   ComPort.Write(outputBuffer[0], Length(outputBuffer));
@@ -647,12 +626,15 @@ begin
 
 end;
 
+procedure TFormComSound.ButtonSetSRClick(Sender: TObject);
+begin
+  FloatEditSampleRate.ValueInt := WaveHeader.nSamplesPerSec div FloatEditDownsample.ValueInt;
+end;
 
 procedure TFormComSound.ButtonPlayWAVClick(Sender: TObject);
 var    FPWaveHeader: PWaveHeader;
 begin
   Downsample := FloatEditDownsample.ValueInt;
-//  FloatEditSampleRate.ValueInt := WaveHeader.nSamplesPerSec div Downsample;
   RadioButtonSampleRate.Checked := true;
   ButtonSetupClick(nil);
 
@@ -668,36 +650,17 @@ begin
 end;
 
 
-function TFormComSound.TakeWAVSample: Word;
-var  ci: integer;
+function TFormComSound.TakeWAVSample: Double;
 begin
   if WAVSampleIndex >= FileSampleCount then
     ButtonStopClick(nil);
-
-//  if WaveHeader.wBitsPerSample = 16 then
-//  begin
-//    Result := Word(PSample16bit^ + 32768) shr 8;
-//    Result := PSample16bit[WAVSampleIndex];
-//
-//    for ci := 0 to WaveHeader.nChannels - 1 do
-//      Inc(PSample16bit);
-//  end;
-
-//  if WaveHeader.wBitsPerSample = 8 then
-//  begin
-//    Result := PSample8bit^;
-//    Result := PSample8bit[WAVSampleIndex];
-//
-//    for ci := 0 to WaveHeader.nChannels - 1 do
-//      Inc(PSample8bit);
-//  end;
 
   if WaveHeader.wBitsPerSample = 16 then
   begin
   {$POINTERMATH ON}
     Result := PSample16bit[WAVSampleIndex * WaveHeader.nChannels];
   {$POINTERMATH OFF}
-    Result := Word(Result + 32768) shr 8;
+    Result := (Result + 32768) / 256;
   end;
 
   if WaveHeader.wBitsPerSample = 8 then
@@ -715,16 +678,14 @@ var
   outputBufferSize: Integer;
   outputBuffer: array of byte;
   i, di: Integer;
-  curSample: byte;
-  sumOfSamples: Integer;
+  curSample: Double;
+  sumOfSamples: Double;
 
 begin
   if preferredOutputBufferSize mod bytesInOutputPacket = 0 then
     outputBufferSize := preferredOutputBufferSize
   else
     outputBufferSize := 32 * bytesInOutputPacket;
-
-//  LabelBufferSize.Caption := IntToStr(outputBufferSize);
 
   SetLength(outputBuffer, outputBufferSize);
 
@@ -734,9 +695,9 @@ begin
     for di := 1 to Downsample do
       sumOfSamples := sumOfSamples + TakeWAVSample;
 
-    curSample := sumOfSamples div Downsample;
+    curSample := sumOfSamples / Downsample;
 
-    processSample(curSample, @outputBuffer[i*bytesInOutputPacket], true);
+    processSample(curSample * scaleSampleCoef, @outputBuffer[i*bytesInOutputPacket]);
   end;
 
   ComPort.Write(outputBuffer[0], Length(outputBuffer));

@@ -297,7 +297,7 @@ object FormComSound: TFormComSound
       end
       object ButtonPWMStart: TButton
         Left = 8
-        Top = 58
+        Top = 57
         Width = 55
         Height = 23
         Caption = 'Start'
@@ -337,10 +337,10 @@ object FormComSound: TFormComSound
       TabOrder = 5
       object Label8: TLabel
         Left = 91
-        Top = 62
-        Width = 64
-        Height = 13
-        Caption = 'Downsample:'
+        Top = 55
+        Width = 37
+        Height = 26
+        Caption = 'Down-'#13#10'sample:'
       end
       object ButtonOpenWAV: TButton
         Left = 8
@@ -353,7 +353,7 @@ object FormComSound: TFormComSound
       end
       object ButtonPlayWAV: TButton
         Left = 8
-        Top = 58
+        Top = 57
         Width = 75
         Height = 23
         Caption = 'Play'
@@ -371,7 +371,7 @@ object FormComSound: TFormComSound
       end
       object FloatEditDownsample: TFloatEdit
         AlignWithMargins = True
-        Left = 161
+        Left = 136
         Top = 58
         Width = 20
         Height = 21
@@ -394,6 +394,15 @@ object FormComSound: TFormComSound
         AutoCorretion = True
         AutoCorretionAsk = True
         SoftValidate = False
+      end
+      object ButtonSetSR: TButton
+        Left = 162
+        Top = 57
+        Width = 47
+        Height = 23
+        Caption = 'Set SR'
+        TabOrder = 4
+        OnClick = ButtonSetSRClick
       end
     end
   end

@@ -12,18 +12,19 @@ var outputSampleRate: Integer;
 var bytesPerSec: Integer;
 var bytesInOutputPacket: Integer;
 var statesInSample: Integer;
-var statesInOutput: Integer;
+var maxInputSampleValue: Integer;
+
+var scaleSampleCoef: Double;
 
 procedure setupConversionViaSampleRate(a_boud: Integer; a_outputSampleRate: Integer);
 procedure setupConversionViaBitCount(a_boud: Integer; a_bitsInSample: byte);
-procedure processSample(sample: word; outputBuffer: PByte; mapStates: boolean);
+procedure processSample(sample: Double; outputBuffer: PByte);
 function processSample3bit(sample3bit: byte): byte;
 
 implementation
 
-var remainBitsFromPrevSample: Single;
-var remainBitsToCompleteByte: Byte;
-var statesCoef: Double;
+//var remainBitsFromPrevSample: Single;
+//var remainBitsToCompleteByte: Byte;
 
 // Fixed 8 bit sample
 procedure setupConversionViaSampleRate(a_boud: Integer; a_outputSampleRate: Integer);
@@ -35,8 +36,8 @@ begin
   outputSampleRate := a_outputSampleRate;
   bytesPerSec := boud div bitsInByte;
   bytesInOutputPacket := Trunc(bytesPerSec / outputSampleRate);
-  statesInOutput := bytesInOutputPacket * 8; // 25 * 8 = 200 for 2000000 Mbit
-  statesCoef := statesInOutput / statesInSample;
+  maxInputSampleValue := bytesInOutputPacket * 8; // = statesInOutputPacket = bitsInOutputPacket
+  scaleSampleCoef := maxInputSampleValue / statesInSample;
 end;
 
 procedure setupConversionViaBitCount(a_boud: Integer; a_bitsInSample: byte);
@@ -50,51 +51,75 @@ begin
 
   outputSampleRate := bytesPerSec div bytesInOutputPacket;
 
-  statesInOutput := statesInSample;
-  statesCoef := statesInOutput / statesInSample;
+  maxInputSampleValue := statesInSample;
+  scaleSampleCoef := 1;
 end;
 
-procedure processSample(sample: word; outputBuffer: PByte; mapStates: boolean);
-var bitsToSet, bytesToSet, remainBits: Byte;
-    i: integer;
-begin
-    if mapStates then
-    begin
-        if sample > statesInOutput then
-            sample := statesInOutput;
-
-        if statesInOutput <> statesInSample then
-          bitsToSet := Round(sample * statesCoef)
-        else
-          bitsToSet := sample;
-    end
-    else
-        bitsToSet := sample;
-
-    bytesToSet := bitsToSet div 8;
-    remainBits := bitsToSet mod 8;
-
-    for i := 0 to bytesToSet - 1 do
-        outputBuffer[i] := MAXBYTE;
-
-    for i := bytesToSet to bytesInOutputPacket - 1 do
-        outputBuffer[i] := 0;
-
-    if remainBits > 0 then
-        outputBuffer[bytesToSet] := (Word(1) shl remainBits) - 1;
-
-//    case (remainBits) of
-//        1: outputBuffer[bytesToSet] := B00000001;
-//        2: outputBuffer[bytesToSet] := B00000011;
-//        3: outputBuffer[bytesToSet] := B00000111;
-//        4: outputBuffer[bytesToSet] := B00001111;
-//        5: outputBuffer[bytesToSet] := B00011111;
-//        6: outputBuffer[bytesToSet] := B00111111;
-//        7: outputBuffer[bytesToSet] := B01111111;
+//procedure processSample(sample: word; outputBuffer: PByte; mapStates: boolean);
+//var bitsToSet, bytesToSet, remainBits: Byte;
+//    i: integer;
+//begin
+//    if mapStates then
+//    begin
+//        if sample > maxInputSampleValue then
+//            sample := maxInputSampleValue;
+//
+//        if maxInputSampleValue <> statesInSample then
+//          bitsToSet := Round(sample * scaleSampleCoef)
+//        else
+//          bitsToSet := sample;
+//    end
+//    else
+//        bitsToSet := sample;
+//
+//    if useSpread then
+//    begin
+//      processSampleSpread(bitsToSet, outputBuffer);
+//      exit;
 //    end;
+//
+//    bytesToSet := bitsToSet div 8;
+//    remainBits := bitsToSet mod 8;
+//
+//    for i := 0 to bytesToSet - 1 do
+//        outputBuffer[i] := MAXBYTE;
+//
+//    for i := bytesToSet to bytesInOutputPacket - 1 do
+//        outputBuffer[i] := 0;
+//
+//    if remainBits > 0 then
+//        outputBuffer[bytesToSet] := (Word(1) shl remainBits) - 1;
+//
+//end;
 
-//   result := remainBitsForNextSample;
+
+procedure processSample(sample: Double; outputBuffer: PByte);
+var byteIndex, bitIndex: Byte;
+    i: integer;
+    loadOnOneBit, remainFromPrevBit: Double;
+begin
+    for i := 0 to bytesInOutputPacket - 1 do
+      outputBuffer[i] := 0;
+
+    loadOnOneBit := sample / maxInputSampleValue;
+    remainFromPrevBit := 0;
+
+    // maxInputSampleValue = number of bits in output packet
+    for i := 0 to maxInputSampleValue - 1 do
+    begin
+      remainFromPrevBit := remainFromPrevBit + loadOnOneBit;
+      if remainFromPrevBit >= 1 then
+      begin
+        byteIndex := i div 8;
+        bitIndex := i mod 8;
+        outputBuffer[byteIndex] := outputBuffer[byteIndex] or (Byte(1) shl bitIndex);
+
+        remainFromPrevBit := remainFromPrevBit - 1;
+      end;
+    end;
+
 end;
+
 
 function processSample3bit(sample3bit: byte): byte;
 begin
