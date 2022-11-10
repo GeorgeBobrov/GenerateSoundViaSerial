@@ -101,6 +101,7 @@ type
     FileSampleCount: integer;
     WAVSampleIndex: integer;
     Downsample: byte;
+    scaleSampleCoef: Double;
 
     procedure SetControlsEnable;
     procedure PlayTone(frequency: Integer);
@@ -167,7 +168,7 @@ begin
   MemoSettings.Clear;
   MemoSettings.Lines.Add('boud: ' + IntToStr(boud));
   MemoSettings.Lines.Add('sampleRate: ' + IntToStr(outputSampleRate));
-  MemoSettings.Lines.Add('input: ' + IntToStr(bitsInSample) + ' bit, '  + IntToStr(statesInSample) + ' states');
+  MemoSettings.Lines.Add('input: ' + IntToStr(bitsInSample) + ' bit');
   MemoSettings.Lines.Add('output: ' + IntToStr(bytesInOutputPacket) + ' bytes, ' +
     IntToStr(maxInputSampleValue + 1) + ' states'); 
 
@@ -629,6 +630,7 @@ end;
 procedure TFormComSound.ButtonSetSRClick(Sender: TObject);
 begin
   FloatEditSampleRate.ValueInt := WaveHeader.nSamplesPerSec div FloatEditDownsample.ValueInt;
+  ButtonSetupClick(nil);
 end;
 
 procedure TFormComSound.ButtonPlayWAVClick(Sender: TObject);
@@ -642,6 +644,13 @@ begin
   Inc(FPWaveHeader);
   PSample16bit := PSmallInt(FPWaveHeader);
   PSample8bit := PByte(FPWaveHeader);
+
+  if WaveHeader.wBitsPerSample = 8 then
+    scaleSampleCoef := maxInputSampleValue / MAXBYTE;
+  if WaveHeader.wBitsPerSample = 16 then
+    scaleSampleCoef := maxInputSampleValue / MAXWORD;
+
+//  scaleSampleCoef := maxInputSampleValue / ((1 shl WaveHeader.wBitsPerSample) - 1);
 
   WAVSampleIndex := 0;
 
@@ -660,7 +669,7 @@ begin
   {$POINTERMATH ON}
     Result := PSample16bit[WAVSampleIndex * WaveHeader.nChannels];
   {$POINTERMATH OFF}
-    Result := (Result + 32768) / 256;
+    Result := Result + 32768;
   end;
 
   if WaveHeader.wBitsPerSample = 8 then

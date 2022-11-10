@@ -11,10 +11,8 @@ var bitsInSample: Byte;
 var outputSampleRate: Integer;
 var bytesPerSec: Integer;
 var bytesInOutputPacket: Integer;
-var statesInSample: Integer;
 var maxInputSampleValue: Integer;
 
-var scaleSampleCoef: Double;
 
 procedure setupConversionViaSampleRate(a_boud: Integer; a_outputSampleRate: Integer);
 procedure setupConversionViaBitCount(a_boud: Integer; a_bitsInSample: byte);
@@ -26,18 +24,16 @@ implementation
 //var remainBitsFromPrevSample: Single;
 //var remainBitsToCompleteByte: Byte;
 
-// Fixed 8 bit sample
+// calculate bytesInOutputPacket and maxInputSampleValue from given SampleRate
 procedure setupConversionViaSampleRate(a_boud: Integer; a_outputSampleRate: Integer);
 begin
   boud := a_boud;
   bitsInByte := 10; // one start and one stop bit
   bitsInSample := 8;
-  statesInSample := MAXBYTE; // bits in 8 bit sample
   outputSampleRate := a_outputSampleRate;
   bytesPerSec := boud div bitsInByte;
   bytesInOutputPacket := Trunc(bytesPerSec / outputSampleRate);
   maxInputSampleValue := bytesInOutputPacket * 8; // = statesInOutputPacket = bitsInOutputPacket
-  scaleSampleCoef := maxInputSampleValue / statesInSample;
 end;
 
 procedure setupConversionViaBitCount(a_boud: Integer; a_bitsInSample: byte);
@@ -46,53 +42,15 @@ begin
   bitsInByte := 10; // one start and one stop bit
   bytesPerSec := boud div bitsInByte;
   bitsInSample := a_bitsInSample;
-  statesInSample := Word(1) shl bitsInSample;
-  bytesInOutputPacket := statesInSample div 8;
+  maxInputSampleValue := Word(1) shl bitsInSample;
+  bytesInOutputPacket := maxInputSampleValue div 8;
 
   outputSampleRate := bytesPerSec div bytesInOutputPacket;
-
-  maxInputSampleValue := statesInSample;
-  scaleSampleCoef := 1;
 end;
 
-//procedure processSample(sample: word; outputBuffer: PByte; mapStates: boolean);
-//var bitsToSet, bytesToSet, remainBits: Byte;
-//    i: integer;
-//begin
-//    if mapStates then
-//    begin
-//        if sample > maxInputSampleValue then
-//            sample := maxInputSampleValue;
-//
-//        if maxInputSampleValue <> statesInSample then
-//          bitsToSet := Round(sample * scaleSampleCoef)
-//        else
-//          bitsToSet := sample;
-//    end
-//    else
-//        bitsToSet := sample;
-//
-//    if useSpread then
-//    begin
-//      processSampleSpread(bitsToSet, outputBuffer);
-//      exit;
-//    end;
-//
-//    bytesToSet := bitsToSet div 8;
-//    remainBits := bitsToSet mod 8;
-//
-//    for i := 0 to bytesToSet - 1 do
-//        outputBuffer[i] := MAXBYTE;
-//
-//    for i := bytesToSet to bytesInOutputPacket - 1 do
-//        outputBuffer[i] := 0;
-//
-//    if remainBits > 0 then
-//        outputBuffer[bytesToSet] := (Word(1) shl remainBits) - 1;
-//
-//end;
 
-
+// sample in range 0..maxInputSampleValue
+// outputBuffer have to be at least bytesInOutputPacket size
 procedure processSample(sample: Double; outputBuffer: PByte);
 var byteIndex, bitIndex: Byte;
     i: integer;
