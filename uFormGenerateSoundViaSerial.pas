@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, CompFloatEdit, ExtCtrls, uGenerateSoundViaSerial, CPort,
-  uGetComPortList, uPlayMelody, uWAV, uFileMap, IoUtils;
+  uGetComPortList, uPlayMelody, uWAV, uFileMap, IoUtils, Math;
 
 type
   TFormComSound = class(TForm)
@@ -168,8 +168,9 @@ begin
   MemoSettings.Clear;
   MemoSettings.Lines.Add('boud: ' + IntToStr(boud));
   MemoSettings.Lines.Add('sampleRate: ' + IntToStr(outputSampleRate));
-  MemoSettings.Lines.Add('input: ' + IntToStr(bitsInSample) + ' bit');
-  MemoSettings.Lines.Add('output: ' + IntToStr(bytesInOutputPacket) + ' bytes, ' +
+  if RadioButtonBitPerSample.Checked then
+    MemoSettings.Lines.Add('input: ' + IntToStr(FloatEditBitPerSample.ValueInt) + ' bit');
+  MemoSettings.Lines.Add('output: ' + FloatToStr(bytesInOutputPacket) + ' bytes, ' +
     IntToStr(maxInputSampleValue + 1) + ' states'); 
 
   s := MemoSettings.Text;
@@ -283,21 +284,24 @@ begin
     ComboBoxPorts.ItemIndex := FindIndex;
   end;
 
+  if (FindIndex = -1) and ComPort.Connected then
+    ComPort.Connected := false;
+
 end;
 
 procedure TFormComSound.CheckComPortExist;
 begin
-  try
-    ComPort.Signals
-  except
-    ComPortAfterClose(nil);
-  end;
+//  try
+//    ComPort.Signals
+//  except
+//    ComPortAfterClose(nil);
+//  end;
 end;
 
 procedure TFormComSound.WMDeviceChange(var Message: TMessage);
 begin
-  if ComPort.Connected then
-    CheckComPortExist;
+//  if ComPort.Connected then
+//    CheckComPortExist;
 
   RefreshPorts;
 end;
@@ -322,14 +326,15 @@ var
 begin
   curSample := FloatEditSample.ValueInt;
 
-  SetLength(outputBuffer, bytesInOutputPacket);
+  SetLength(outputBuffer, Ceil(bytesInOutputPacket));
+  shiftFromStart := 0;
   processSample(curSample, PByte(outputBuffer));
 
   for i := 0 to Length(outputBuffer) - 1 do
     str := str + ' ' + IntToBinByte(outputBuffer[i]);
 
   MemoDebug.Lines.Add('curSample: ' + IntToStr(curSample) + ', outputBuffer (' +
-    IntToStr(bytesInOutputPacket) + 'bytes): ' + str);
+    IntToStr(Ceil(bytesInOutputPacket)) + 'bytes): ' + str);
 end;
 
 
@@ -364,10 +369,12 @@ end;
 
 procedure TFormComSound.FloatEditSampleValidate(Sender: TObject);
 var
-  i: Integer;
-  outputSampleBuffer: array of byte;
   outputBufferSize: Integer;
   PWM_Value: word;
+  curPacketSize: Integer;
+  bufferOffset: Integer;
+  i: Integer;
+  str: string;
 begin
   if MemoDebug.Visible then
     ButtonProcessClick(nil);
@@ -376,20 +383,33 @@ begin
   if CheckBoxCustomBufferSize.Checked then
     outputBufferSize := FloatEditCustomBufferSize.ValueInt
   else
-    if preferredOutputBufferSize mod bytesInOutputPacket = 0 then
+    if Frac(preferredOutputBufferSize / bytesInOutputPacket) = 0 then
       outputBufferSize := preferredOutputBufferSize
     else
-      outputBufferSize := 32 * bytesInOutputPacket;
+      outputBufferSize := Round(32 * bytesInOutputPacket);
 
   LabelBufferSize.Caption := IntToStr(outputBufferSize);
 
   SetLength(outputBuffer, outputBufferSize);
+  ZeroMemory(outputBuffer, outputBufferSize);
 
-  SetLength(outputSampleBuffer, bytesInOutputPacket);
-  processSample(PWM_Value, PByte(outputSampleBuffer));
+  bufferOffset := 0;
+  shiftFromStart := 0;
+  while bufferOffset < Length(outputBuffer) do
+  begin
+    curPacketSize := processSample(PWM_Value, @outputBuffer[bufferOffset]);
+    Inc(bufferOffset, curPacketSize)
+  end;
 
-  for i := 0 to Length(outputBuffer) - 1 do
-    outputBuffer[i] := outputSampleBuffer[i mod Length(outputSampleBuffer)];
+  if MemoDebug.Visible then
+  begin
+    for i := 0 to Length(outputBuffer) - 1 do
+      str := str + ' ' + IntToStr(outputBuffer[i]);
+
+    MemoDebug.Lines.Add('outputBuffer PWM for ' + IntToStr(PWM_Value)
+        + ': ' + str);
+  end;
+
 end;
 
 
@@ -427,6 +447,7 @@ end;
 
 procedure TFormComSound.ButtonGeneratorStartClick(Sender: TObject);
 begin
+  shiftFromStart := 0;
   ComPort.OnTxEmpty := ComPortTxEmptyGenerator;
   ComPort.WriteStr('A');
 end;
@@ -464,18 +485,20 @@ var
   curSample: Double;
   outputBufferSize: Integer;
   outputBuffer: array of byte;
-  i: Integer;
+  curPacketSize: Integer;
+  bufferOffset: Integer;
 begin
   period := (outputSampleRate / frequency);
 
-  if preferredOutputBufferSize mod bytesInOutputPacket = 0 then
+  if Frac(preferredOutputBufferSize / bytesInOutputPacket) = 0 then
     outputBufferSize := preferredOutputBufferSize
   else
-    outputBufferSize := 32 * bytesInOutputPacket;
+    outputBufferSize := Round(32 * bytesInOutputPacket);
 
   SetLength(outputBuffer, outputBufferSize);
 
-  for i := 0 to (Length(outputBuffer) div bytesInOutputPacket) - 1 do
+  bufferOffset := 0;
+  while bufferOffset < Length(outputBuffer) do
   begin
     curSampleSin := sin(((lastGenIndex / period) * 2 * Pi) + (Pi / 2));  // -1..1
     curSampleSin := (curSampleSin + 1) / 2;                   //  0..1
@@ -483,7 +506,8 @@ begin
 
     Inc(lastGenIndex);
 
-    processSample(curSample, @outputBuffer[i*bytesInOutputPacket]);
+    curPacketSize := processSample(curSample, @outputBuffer[bufferOffset]);
+    Inc(bufferOffset, curPacketSize)
   end;
 
   ComPort.Write(outputBuffer[0], Length(outputBuffer));
@@ -653,6 +677,7 @@ begin
 //  scaleSampleCoef := maxInputSampleValue / ((1 shl WaveHeader.wBitsPerSample) - 1);
 
   WAVSampleIndex := 0;
+  shiftFromStart := 0;
 
   ComPort.OnTxEmpty := ComPortTxEmptyPlayWAV;
   ComPort.WriteStr('A');
@@ -681,32 +706,34 @@ begin
 end;
 
 
-
 procedure TFormComSound.ComPortTxEmptyPlayWAV(Sender: TObject);
 var
   outputBufferSize: Integer;
   outputBuffer: array of byte;
-  i, di: Integer;
+  di, curPacketSize: Integer;
   curSample: Double;
   sumOfSamples: Double;
+  bufferOffset: Integer;
 
 begin
-  if preferredOutputBufferSize mod bytesInOutputPacket = 0 then
+  if Frac(preferredOutputBufferSize / bytesInOutputPacket) = 0 then
     outputBufferSize := preferredOutputBufferSize
   else
-    outputBufferSize := 32 * bytesInOutputPacket;
+    outputBufferSize := Round(32 * bytesInOutputPacket);
 
   SetLength(outputBuffer, outputBufferSize);
 
-  for i := 0 to (Length(outputBuffer) div bytesInOutputPacket) - 1 do
+  bufferOffset := 0;
+  while bufferOffset < Length(outputBuffer) do
   begin
     sumOfSamples := 0;
     for di := 1 to Downsample do
       sumOfSamples := sumOfSamples + TakeWAVSample;
 
-    curSample := sumOfSamples / Downsample;
+    curSample := (sumOfSamples / Downsample) * scaleSampleCoef;
 
-    processSample(curSample * scaleSampleCoef, @outputBuffer[i*bytesInOutputPacket]);
+    curPacketSize := processSample(curSample, @outputBuffer[bufferOffset]);
+    Inc(bufferOffset, curPacketSize)
   end;
 
   ComPort.Write(outputBuffer[0], Length(outputBuffer));
