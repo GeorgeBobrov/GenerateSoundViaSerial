@@ -89,8 +89,10 @@ const // 1d arrays
 procedure playMelody(p: PAnsiChar);
 
 var   playTone: procedure(frequency: integer) of object;
+      playNote: procedure(note: integer; duration_ms: integer) of object;
       delay: function(duration_ms: integer): boolean of object; // return true to break;
       noTone: procedure of object;
+      stopNote: procedure(note: integer) of object;
 
 
 implementation
@@ -117,6 +119,7 @@ var
   note,
   scale       : byte;
   breakPlaying: boolean;
+  MIDI_note   : integer;
 begin
   // Absolutely no error checking in here
   default_dur := 4;
@@ -248,15 +251,29 @@ begin
 //      Serial.print(notes[(scale - 4) * 12 + note], 10);
 //      Serial.print(') ');
 //      Serial.println(duration, 10);
-      playTone( notes[(scale - 4) * 12 + note]);
-      breakPlaying := delay(duration);
-      noTone;
+
+      if Assigned(playTone) then
+        playTone( notes[(scale - 4) * 12 + note]);
+
+      MIDI_note := (scale) * 12 + note;
+      if Assigned(playNote) then
+        playNote(MIDI_note, duration);
+
+      if Assigned(delay) then
+        breakPlaying := delay(duration);
+
+      if Assigned(noTone) then
+        noTone;
+
+      if Assigned(stopNote) then
+        stopNote(MIDI_note);
     end
     else
     begin
 //      Serial.print('Pausing: ');
 //      Serial.println(duration, 10);
-      breakPlaying := delay(duration);
+      if Assigned(delay) then
+        breakPlaying := delay(duration);
     end;
 
     if breakPlaying then break;

@@ -2,8 +2,8 @@ object FormComSound: TFormComSound
   Left = 296
   Top = 278
   Caption = 'Generate Sound Via Serial'
-  ClientHeight = 372
-  ClientWidth = 808
+  ClientHeight = 433
+  ClientWidth = 865
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -18,7 +18,7 @@ object FormComSound: TFormComSound
   object PanelMain: TPanel
     Left = 0
     Top = 0
-    Width = 808
+    Width = 865
     Height = 121
     Align = alTop
     TabOrder = 0
@@ -26,7 +26,7 @@ object FormComSound: TFormComSound
     object PanelCom: TPanel
       Left = 1
       Top = 1
-      Width = 806
+      Width = 863
       Height = 27
       Align = alTop
       TabOrder = 0
@@ -409,8 +409,8 @@ object FormComSound: TFormComSound
   object PanelClient: TPanel
     Left = 0
     Top = 121
-    Width = 808
-    Height = 251
+    Width = 865
+    Height = 312
     Align = alClient
     TabOrder = 1
     ExplicitTop = 72
@@ -420,8 +420,8 @@ object FormComSound: TFormComSound
       AlignWithMargins = True
       Left = 4
       Top = 30
-      Width = 800
-      Height = 217
+      Width = 857
+      Height = 278
       Align = alClient
       Lines.Strings = (
         'MemoDebug')
@@ -432,8 +432,8 @@ object FormComSound: TFormComSound
     object PanelMelodies: TPanel
       Left = 1
       Top = 27
-      Width = 806
-      Height = 223
+      Width = 863
+      Height = 284
       Align = alClient
       TabOrder = 1
       ExplicitTop = 1
@@ -443,11 +443,11 @@ object FormComSound: TFormComSound
         AlignWithMargins = True
         Left = 4
         Top = 4
-        Width = 798
+        Width = 855
         Height = 13
         Align = alTop
-        Caption = 'Melodies:'
-        ExplicitWidth = 45
+        Caption = 'Melodies (Double click to play):'
+        ExplicitWidth = 147
       end
       object LabelDelay: TLabel
         Left = 183
@@ -461,8 +461,8 @@ object FormComSound: TFormComSound
         AlignWithMargins = True
         Left = 4
         Top = 23
-        Width = 798
-        Height = 196
+        Width = 855
+        Height = 257
         Align = alClient
         ItemHeight = 13
         Items.Strings = (
@@ -539,14 +539,40 @@ object FormComSound: TFormComSound
             '16d,16d,16d,16c,16d,16d,16d')
         TabOrder = 0
         OnDblClick = ListBoxMelodiesDblClick
-        ExplicitWidth = 844
-        ExplicitHeight = 167
+        ExplicitLeft = 3
+      end
+      object RadioButtonPlayMelodyToSerial: TRadioButton
+        Left = 390
+        Top = 2
+        Width = 124
+        Height = 17
+        Caption = 'Play Melody To Serial'
+        Checked = True
+        TabOrder = 1
+        TabStop = True
+      end
+      object RadioButtonPlayMelodyToMIDI: TRadioButton
+        Left = 544
+        Top = 2
+        Width = 121
+        Height = 17
+        Caption = 'Play Melody To MIDI'
+        TabOrder = 2
+      end
+      object ButtonTestMIDI: TButton
+        Left = 696
+        Top = 1
+        Width = 75
+        Height = 22
+        Caption = 'Test MIDI'
+        TabOrder = 3
+        OnClick = ButtonTestMIDIClick
       end
     end
     object PanelDebug: TPanel
       Left = 1
       Top = 1
-      Width = 806
+      Width = 863
       Height = 26
       Align = alTop
       TabOrder = 2

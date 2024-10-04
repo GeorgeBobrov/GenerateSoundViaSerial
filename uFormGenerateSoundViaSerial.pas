@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, CompFloatEdit, ExtCtrls, uGenerateSoundViaSerial, CPort,
-  uGetComPortList, uPlayMelody, uWAV, uFileMap, IoUtils, Math;
+  uGetComPortList, uPlayMelody, uWAV, uFileMap, IoUtils, Math, MMSystem;
 
 type
   TFormComSound = class(TForm)
@@ -57,6 +57,9 @@ type
     LabelBufferSize: TLabel;
     CheckBoxSetBoudMeasured: TCheckBox;
     ButtonSetSR: TButton;
+    RadioButtonPlayMelodyToSerial: TRadioButton;
+    RadioButtonPlayMelodyToMIDI: TRadioButton;
+    ButtonTestMIDI: TButton;
     procedure ButtonProcessClick(Sender: TObject);
     procedure ButtonSetupClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
@@ -84,6 +87,7 @@ type
     procedure ButtonPlayWAVClick(Sender: TObject);
     procedure ComPortTxEmptyPlayWAV(Sender: TObject);
     procedure ButtonSetSRClick(Sender: TObject);
+    procedure ButtonTestMIDIClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -107,6 +111,10 @@ type
     procedure PlayTone(frequency: Integer);
     procedure NoTone;
     function Delay(duration_ms: Integer): boolean;
+    procedure PlayNoteMIDI(Note, Duration: Integer);
+    procedure StartNoteMIDI(Note, Duration: Integer);
+    procedure StopNoteMIDI(Note: Integer);
+
     function TakeWAVSample: Double;
 
     procedure WMDeviceChange(var Message: TMessage); message WM_DEVICECHANGE;
@@ -213,6 +221,8 @@ begin
 end;
 
 
+
+
 procedure TFormComSound.ButtonConnectClick(Sender: TObject);
 begin
   if not ComPort.Connected then
@@ -255,6 +265,8 @@ begin
   ButtonGeneratorStart.Enabled := ComPortConnected;
   ButtonPlayWAV.Enabled := ComPortConnected and Assigned(FileMapper) and FileMapper.MapPtrActive;
 end;
+
+
 
 
 procedure TFormComSound.RefreshPorts;
@@ -524,6 +536,8 @@ end;
 
 
 // ----------------------------         PlayMelody     -------------------------------------------
+var
+  H_MIDI_OUT: HMIDIOUT;
 
 procedure TFormComSound.ListBoxMelodiesDblClick(Sender: TObject);
 var
@@ -531,13 +545,32 @@ var
 begin
   melody := ListBoxMelodies.Items[ListBoxMelodies.ItemIndex];
 
-  uPlayMelody.playTone := PlayTone;
-  uPlayMelody.delay := Delay;
-  uPlayMelody.noTone := NoTone;
-  BreakPlaying := false;
+  if RadioButtonPlayMelodyToSerial.Checked then
+  begin
+    uPlayMelody.playTone := PlayTone;
+    uPlayMelody.delay := Delay;
+    uPlayMelody.noTone := NoTone;
+    BreakPlaying := false;
 
-  if ButtonGeneratorStart.Enabled then
+    if ButtonGeneratorStart.Enabled then
+      playMelody(PAnsiChar(melody));
+  end;
+
+  if RadioButtonPlayMelodyToMIDI.Checked then
+  begin
+    if H_MIDI_OUT = 0 then
+      midiOutOpen(@H_MIDI_OUT, MIDI_MAPPER, 0, 0, CALLBACK_NULL);
+
+    uPlayMelody.playTone := nil;
+    uPlayMelody.playNote := StartNoteMIDI;
+    uPlayMelody.delay := Delay;
+    uPlayMelody.noTone := nil;
+    uPlayMelody.stopNote := StopNoteMIDI;
+    BreakPlaying := false;
+
     playMelody(PAnsiChar(melody));
+  end;
+
 end;
 
 
@@ -577,6 +610,27 @@ begin
 end;
 
 
+
+
+procedure TFormComSound.StartNoteMIDI(Note, Duration: Integer);
+var
+  Event: DWORD;
+begin
+  FloatEditFrequency.ValueInt := Note;
+  FloatEditFrequencyValidate(nil);
+
+  // Формируем MIDI-сообщение для включения ноты
+  Event := $007F0090 or (Note shl 8);  // 0x90 - включение ноты, 0x7F - громкость
+  midiOutShortMsg(H_MIDI_OUT, Event);
+end;
+
+procedure TFormComSound.StopNoteMIDI(Note: Integer);
+var
+  Event: DWORD;
+begin
+  Event := $00000090 or (Note shl 8);  // 0x90 - выключение ноты
+  midiOutShortMsg(H_MIDI_OUT, Event);
+end;
 
 // ----------------------------        Play WAV       -------------------------------------------
 
@@ -741,5 +795,40 @@ begin
 end;
 
 
+// -------------------------        Test MIDI       --------------------------------------
+
+procedure TFormComSound.ButtonTestMIDIClick(Sender: TObject);
+begin
+  // Открываем MIDI-устройство
+  if H_MIDI_OUT = 0 then
+    midiOutOpen(@H_MIDI_OUT, MIDI_MAPPER, 0, 0, CALLBACK_NULL);
+  // Пример мелодии: простая победная мелодия
+  PlayNoteMIDI(67, 500);  // G (67) на 500 мс
+  PlayNoteMIDI(71, 500);  // B (71) на 500 мс
+  PlayNoteMIDI(74, 500);  // D (74) на 500 мс
+  PlayNoteMIDI(79, 500);  // G (79) на 500 мс (октава выше)
+  // Закрываем MIDI-устройство
+  midiOutClose(H_MIDI_OUT);
+  H_MIDI_OUT := 0;
+end;
+
+procedure TFormComSound.PlayNoteMIDI(Note, Duration: Integer);
+var
+  Event: DWORD;
+begin
+  FloatEditFrequency.ValueInt := Note;
+  FloatEditFrequencyValidate(nil);
+
+  // Формируем MIDI-сообщение для включения ноты
+  Event := $007F0090 or (Note shl 8);  // 0x90 - включение ноты, 0x7F - громкость
+  midiOutShortMsg(H_MIDI_OUT, Event);
+
+  // Ждем, пока нота будет проигрываться в течение указанного времени
+  Delay(Duration);
+
+  // Формируем MIDI-сообщение для выключения ноты
+  Event := $00000090 or (Note shl 8);  // 0x90 - выключение ноты
+  midiOutShortMsg(H_MIDI_OUT, Event);
+end;
 
 end.
