@@ -55,7 +55,7 @@ const
 
 
 const // 1d arrays
-  notes : array[0..48] of integer = (
+  freq_of_notes : array[0..48] of integer = (
     0, NOTE_C4, NOTE_CS4, NOTE_D4, NOTE_DS4, NOTE_E4, NOTE_F4, NOTE_FS4,
     NOTE_G4, NOTE_GS4, NOTE_A4, NOTE_AS4, NOTE_B4, NOTE_C5, NOTE_CS5,
     NOTE_D5, NOTE_DS5, NOTE_E5, NOTE_F5, NOTE_FS5, NOTE_G5, NOTE_GS5,
@@ -85,14 +85,20 @@ const // 1d arrays
 //    song1, song2, song3, song4, song5, song6, song7, song8, song9, song10,
 //    song11, song12, song13, song14, song15 );
 
+type
 
-procedure playMelody(p: PAnsiChar);
+TParserRTTTL = class
+  default_dur,
+  default_oct : byte;
+  wholenote   : integer;
+  p: PAnsiChar;
+  constructor StartParsing(_p: PAnsiChar);
 
-var   playTone: procedure(frequency: integer) of object;
-      playNote: procedure(note: integer; duration_ms: integer) of object;
-      delay: function(duration_ms: integer): boolean of object; // return true to break;
-      noTone: procedure of object;
-      stopNote: procedure(note: integer) of object;
+  // ParseNextNote returns false if end of melody; note = 0 if pause; note in 1..12; duration in ms
+  function ParseNextNote(var note: integer; var octave: byte; var duration: integer): Boolean;
+end;
+
+function GetFrequency(note: integer; octave: byte): Integer;
 
 
 implementation
@@ -108,19 +114,12 @@ begin
 end;
 
 
-procedure playMelody(p: PAnsiChar);
+constructor TParserRTTTL.StartParsing(_p: PAnsiChar);
 var
-  default_dur,
-  default_oct : byte;
   bpm,
   num         : integer;
-  wholenote,
-  duration    : integer;
-  note,
-  scale       : byte;
-  breakPlaying: boolean;
-  MIDI_note   : integer;
 begin
+  p := _p;
   // Absolutely no error checking in here
   default_dur := 4;
   default_oct := 6;
@@ -176,112 +175,89 @@ begin
   // BPM usually expresses the number of quarter notes per minute
   wholenote := Round(60 * 1000 / bpm) * 4;  // this is the time for whole note (in milliseconds)
 //  Serial.print('wn: '); Serial.println(wholenote, 10);
-
-  // now begin note loop
-  while p^ <> #0 do
-  begin
-    // first, get note duration, if available
-    num := 0;
-    while isdigit(p^) do
-    begin
-      num := (num * 10) + getdigit(p^);
-      Inc(p);
-    end;
-    if num <> 0 then
-      duration := wholenote div num
-    else
-      duration := wholenote div default_dur;
-
-    // now get the note
-    note := 0;
-    case p^ of
-      'c':
-        note := 1;
-      'd':
-        note := 3;
-      'e':
-        note := 5;
-      'f':
-        note := 6;
-      'g':
-        note := 8;
-      'a':
-        note := 10;
-      'b':
-        note := 12;
-      'p':
-      else
-        note := 0;
-    end;
-    Inc(p);
-
-    // now, get optional '#' sharp
-    if p^ = '#' then
-    begin
-      Inc(note);
-      Inc(p);
-    end;
-
-    // now, get optional '.' dotted note
-    if p^ = '.' then
-    begin
-      duration  := duration + (duration div 2);
-      Inc(p);
-    end;
-
-    // now, get scale
-    if isdigit(p^) then
-    begin
-      scale := getdigit(p^);
-      Inc(p);
-    end
-    else
-    begin
-      scale := default_oct;
-    end;
-    scale  := scale + OCTAVE_OFFSET;
-    if p^ = ',' then Inc(p);       // skip comma for next note (or we may be at the end)
-
-    // now play the note
-    if note <> 0 then
-    begin
-//      Serial.print('Playing: ');
-//      Serial.print(scale, 10); Serial.print(' ');
-//      Serial.print(note, 10); Serial.print(' (');
-//      Serial.print(notes[(scale - 4) * 12 + note], 10);
-//      Serial.print(') ');
-//      Serial.println(duration, 10);
-
-      if Assigned(playTone) then
-        playTone( notes[(scale - 4) * 12 + note]);
-
-      MIDI_note := (scale) * 12 + note;
-      if Assigned(playNote) then
-        playNote(MIDI_note, duration);
-
-      if Assigned(delay) then
-        breakPlaying := delay(duration);
-
-      if Assigned(noTone) then
-        noTone;
-
-      if Assigned(stopNote) then
-        stopNote(MIDI_note);
-    end
-    else
-    begin
-//      Serial.print('Pausing: ');
-//      Serial.println(duration, 10);
-      if Assigned(delay) then
-        breakPlaying := delay(duration);
-    end;
-
-    if breakPlaying then break;
-  end;
 end;
 
 
 
+
+function TParserRTTTL.ParseNextNote(var note: integer; var octave: byte; var duration: integer): Boolean;
+var
+  num         : integer;
+begin
+  // now begin note loop
+
+  if (p^ = #0) then exit(false);
+
+  // first, get note duration, if available
+  num := 0;
+  while isdigit(p^) do
+  begin
+    num := (num * 10) + getdigit(p^);
+    Inc(p);
+  end;
+  if num <> 0 then
+    duration := wholenote div num
+  else
+    duration := wholenote div default_dur;
+
+  // now get the note
+  note := 0;
+  case p^ of
+    'c':
+      note := 1;
+    'd':
+      note := 3;
+    'e':
+      note := 5;
+    'f':
+      note := 6;
+    'g':
+      note := 8;
+    'a':
+      note := 10;
+    'b':
+      note := 12;
+    'p':
+    else
+      note := 0;
+  end;
+  Inc(p);
+
+  // now, get optional '#' sharp
+  if p^ = '#' then
+  begin
+    Inc(note);
+    Inc(p);
+  end;
+
+  // now, get optional '.' dotted note
+  if p^ = '.' then
+  begin
+    duration  := duration + (duration div 2);
+    Inc(p);
+  end;
+
+  // now, get octave
+  if isdigit(p^) then
+  begin
+    octave := getdigit(p^);
+    Inc(p);
+  end
+  else
+  begin
+    octave := default_oct;
+  end;
+  octave  := octave + OCTAVE_OFFSET;
+  if p^ = ',' then Inc(p);       // skip comma for next note (or we may be at the end)
+
+  exit(true);
+end;
+
+
+function GetFrequency(note: integer; octave: byte): Integer;
+begin
+  Result := freq_of_notes[(octave - 4) * 12 + note];
+end;
 
 end.
 

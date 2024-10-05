@@ -413,9 +413,6 @@ object FormComSound: TFormComSound
     Height = 312
     Align = alClient
     TabOrder = 1
-    ExplicitTop = 72
-    ExplicitWidth = 457
-    ExplicitHeight = 265
     object MemoDebug: TMemo
       AlignWithMargins = True
       Left = 4
@@ -428,6 +425,7 @@ object FormComSound: TFormComSound
       ScrollBars = ssVertical
       TabOrder = 0
       Visible = False
+      ExplicitHeight = 50
     end
     object PanelMelodies: TPanel
       Left = 1
@@ -436,9 +434,6 @@ object FormComSound: TFormComSound
       Height = 284
       Align = alClient
       TabOrder = 1
-      ExplicitTop = 1
-      ExplicitWidth = 852
-      ExplicitHeight = 240
       object Label7: TLabel
         AlignWithMargins = True
         Left = 4
@@ -456,6 +451,13 @@ object FormComSound: TFormComSound
         Height = 13
         Caption = 'LabelDelay'
         Visible = False
+      end
+      object LabelNoteMIDI: TLabel
+        Left = 723
+        Top = 4
+        Width = 23
+        Height = 13
+        Caption = 'Note'
       end
       object ListBoxMelodies: TListBox
         AlignWithMargins = True
@@ -539,10 +541,9 @@ object FormComSound: TFormComSound
             '16d,16d,16d,16c,16d,16d,16d')
         TabOrder = 0
         OnDblClick = ListBoxMelodiesDblClick
-        ExplicitLeft = 3
       end
       object RadioButtonPlayMelodyToSerial: TRadioButton
-        Left = 390
+        Left = 353
         Top = 2
         Width = 124
         Height = 17
@@ -552,7 +553,7 @@ object FormComSound: TFormComSound
         TabStop = True
       end
       object RadioButtonPlayMelodyToMIDI: TRadioButton
-        Left = 544
+        Left = 497
         Top = 2
         Width = 121
         Height = 17
@@ -560,10 +561,10 @@ object FormComSound: TFormComSound
         TabOrder = 2
       end
       object ButtonTestMIDI: TButton
-        Left = 696
+        Left = 638
         Top = 1
         Width = 75
-        Height = 22
+        Height = 21
         Caption = 'Test MIDI'
         TabOrder = 3
         OnClick = ButtonTestMIDIClick
