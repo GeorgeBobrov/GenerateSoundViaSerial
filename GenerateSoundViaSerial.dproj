@@ -43,7 +43,7 @@
 			</DCCReference>
 			<DCCReference Include="uGenerateSoundViaSerial.pas"/>
 			<DCCReference Include="uGetComPortList.pas"/>
-			<DCCReference Include="uPlayMelody.pas"/>
+			<DCCReference Include="uRTTTL_Parser.pas"/>
 			<DCCReference Include="uWAV.pas"/>
 			<DCCReference Include="uFileMap.pas"/>
 			<BuildConfiguration Include="Base">

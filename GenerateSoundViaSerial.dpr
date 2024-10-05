@@ -5,7 +5,7 @@ uses
   uFormGenerateSoundViaSerial in 'uFormGenerateSoundViaSerial.pas' {FormComSound},
   uGenerateSoundViaSerial in 'uGenerateSoundViaSerial.pas',
   uGetComPortList in 'uGetComPortList.pas',
-  uPlayMelody in 'uPlayMelody.pas',
+  uRTTTL_Parser in 'uRTTTL_Parser.pas',
   uWAV in 'uWAV.pas',
   uFileMap in 'uFileMap.pas';
 

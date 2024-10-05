@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, CompFloatEdit, ExtCtrls, uGenerateSoundViaSerial, CPort,
-  uGetComPortList, uPlayMelody, uWAV, uFileMap, IoUtils, Math, MMSystem;
+  uGetComPortList, uRTTTL_Parser, uWAV, uFileMap, IoUtils, Math, MMSystem;
 
 type
   TFormComSound = class(TForm)
@@ -551,11 +551,11 @@ var
 procedure TFormComSound.ListBoxMelodiesDblClick(Sender: TObject);
 var
   melody: AnsiString;
-  ParserRTTTL: TParserRTTTL;
+  MelodyParser: T_RTTTL_Parser;
   note: integer;
-  duration_ms: integer;
-  MIDI_note   : integer;
   octave: byte;
+  duration_ms: integer;
+  noteMIDI   : integer;
 begin
   melody := ListBoxMelodies.Items[ListBoxMelodies.ItemIndex];
 
@@ -565,9 +565,9 @@ begin
 
     if ButtonGeneratorStart.Enabled then
     begin
-      ParserRTTTL := TParserRTTTL.StartParsing(PAnsiChar(melody));
+      MelodyParser := T_RTTTL_Parser.StartParsing(PAnsiChar(melody));
 
-      while ParserRTTTL.ParseNextNote(note, octave, duration_ms) and not breakPlaying do
+      while MelodyParser.ParseNextNote(note, octave, duration_ms) and not breakPlaying do
       begin
         if note <> 0 then   // note = 0 if pause
         begin
@@ -579,7 +579,7 @@ begin
           Delay(duration_ms);
       end;
 
-      FreeAndNil(ParserRTTTL);
+      FreeAndNil(MelodyParser);
     end;
   end;
 
@@ -592,22 +592,22 @@ begin
 
     if H_MIDI_OUT <> 0 then
     begin
-      ParserRTTTL := TParserRTTTL.StartParsing(PAnsiChar(melody));
+      MelodyParser := T_RTTTL_Parser.StartParsing(PAnsiChar(melody));
 
-      while ParserRTTTL.ParseNextNote(note, octave, duration_ms) and not breakPlaying do
+      while MelodyParser.ParseNextNote(note, octave, duration_ms) and not breakPlaying do
       begin
         if note <> 0 then  // note = 0 if pause
         begin
-          MIDI_note := (octave) * 12 + note;
-          StartNoteMIDI(MIDI_note, duration_ms);
+          noteMIDI := (octave) * 12 + note;
+          StartNoteMIDI(noteMIDI, duration_ms);
           Delay(duration_ms);
-          StopNoteMIDI(MIDI_note);
+          StopNoteMIDI(noteMIDI);
         end
         else
           delay(duration_ms);
       end;
 
-      FreeAndNil(ParserRTTTL);
+      FreeAndNil(MelodyParser);
       midiOutClose(H_MIDI_OUT);
       H_MIDI_OUT := 0;
       BreakPlaying := true;

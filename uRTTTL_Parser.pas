@@ -1,4 +1,4 @@
-unit uPlayMelody;
+unit uRTTTL_Parser;
 
 interface
 
@@ -87,7 +87,7 @@ const // 1d arrays
 
 type
 
-TParserRTTTL = class
+T_RTTTL_Parser = class
   default_dur,
   default_oct : byte;
   wholenote   : integer;
@@ -114,7 +114,7 @@ begin
 end;
 
 
-constructor TParserRTTTL.StartParsing(_p: PAnsiChar);
+constructor T_RTTTL_Parser.StartParsing(_p: PAnsiChar);
 var
   bpm,
   num         : integer;
@@ -180,7 +180,7 @@ end;
 
 
 
-function TParserRTTTL.ParseNextNote(var note: integer; var octave: byte; var duration: integer): Boolean;
+function T_RTTTL_Parser.ParseNextNote(var note: integer; var octave: byte; var duration: integer): Boolean;
 var
   num         : integer;
 begin
